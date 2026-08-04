@@ -14,7 +14,7 @@ const steps = [
     title: "Pay ₹19",
     description:
       "Secure payment via UPI, Google Pay, PhonePe, Paytm, card or net banking. One-time payment. No subscriptions.",
-    detail: "UPI · GPay · PhonePe · Paytm · Card · Net Banking",
+    detail: "UPI · GPay · PhonePe · Paytm",
   },
   {
     number: "03",

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { MessageCircle, Mail } from "lucide-react";
-import { ROUTES } from "@/lib/constants";
+import { Mail } from "lucide-react";
+import { BRAND, ROUTES } from "@/lib/constants";
 
 export function ContactSection() {
   return (
@@ -19,34 +19,18 @@ export function ContactSection() {
             We&apos;re here to help. Reach out before or after purchase.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+          <div className="max-w-md mx-auto mb-10">
             <a
-              href="https://wa.me/919999999999"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="card-elevated p-6 flex items-center gap-4 hover:border-[#c41e3a]/30 transition-colors"
-              id="contact-whatsapp"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[#1a0509] border border-[#3a0a14] flex items-center justify-center flex-shrink-0">
-                <MessageCircle size={18} className="text-[#c41e3a]" />
-              </div>
-              <div className="text-left">
-                <p className="text-white font-semibold text-sm">WhatsApp</p>
-                <p className="text-[#5a5a5a] text-xs">Reply within 2 hours</p>
-              </div>
-            </a>
-
-            <a
-              href="mailto:hello@revandrep.in"
-              className="card-elevated p-6 flex items-center gap-4 hover:border-[#c41e3a]/30 transition-colors"
+              href={`mailto:${BRAND.supportEmail}`}
+              className="card-elevated p-6 flex items-center justify-center gap-4 hover:border-[#c41e3a]/30 transition-colors"
               id="contact-email"
             >
               <div className="w-10 h-10 rounded-lg bg-[#1a0509] border border-[#3a0a14] flex items-center justify-center flex-shrink-0">
                 <Mail size={18} className="text-[#c41e3a]" />
               </div>
               <div className="text-left">
-                <p className="text-white font-semibold text-sm">Email</p>
-                <p className="text-[#5a5a5a] text-xs">hello@revandrep.in</p>
+                <p className="text-white font-semibold text-sm">Help &amp; Support Email</p>
+                <p className="text-[#a0a0a0] text-xs">{BRAND.supportEmail}</p>
               </div>
             </a>
           </div>

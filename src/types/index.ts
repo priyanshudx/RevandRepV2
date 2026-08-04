@@ -155,6 +155,19 @@ export interface AdminStats {
   totalUsers: number;
 }
 
+export interface AdminUserItem {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: Role;
+  supabaseId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  _count: {
+    orders: number;
+  };
+}
+
 // ── File Upload Types ──────────────────────────────────────────────────────
 
 export interface UploadedFile {

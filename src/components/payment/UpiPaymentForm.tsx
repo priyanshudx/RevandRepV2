@@ -3,9 +3,9 @@
 import { useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Copy, Check, Upload, Loader2, AlertCircle, Shield } from "lucide-react";
+import { Upload, Loader2, AlertCircle, Shield } from "lucide-react";
 import { submitUpiPaymentAction } from "@/actions/payment";
-import { UPI_ID, UPI_AMOUNT } from "@/lib/constants";
+import { UPI_AMOUNT } from "@/lib/constants";
 
 interface Props {
   orderId: string;
@@ -16,18 +16,11 @@ interface Props {
 export function UpiPaymentForm({ orderId, isResubmit, rejectionReason }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [copied, setCopied] = useState(false);
   const [utr, setUtr] = useState("");
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  function handleCopyUpi() {
-    navigator.clipboard.writeText(UPI_ID).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
@@ -40,18 +33,31 @@ export function UpiPaymentForm({ orderId, isResubmit, rejectionReason }: Props) 
     }
   }
 
+  function handleUtrChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const cleaned = e.target.value.replace(/\D/g, "").slice(0, 12);
+    setUtr(cleaned);
+    if (error) setError(null);
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (utr.trim().length < 6) {
-      setError("Please enter a valid UTR / Transaction ID.");
+    const cleanUtr = utr.trim();
+
+    if (!cleanUtr) {
+      setError("Please enter your 12-digit UTR / Transaction ID.");
+      return;
+    }
+
+    if (cleanUtr.length !== 12) {
+      setError(`UTR number must be exactly 12 digits (currently ${cleanUtr.length} digits). Please check your payment receipt.`);
       return;
     }
 
     const fd = new FormData();
     fd.append("orderId", orderId);
-    fd.append("utrNumber", utr.trim());
+    fd.append("utrNumber", cleanUtr);
     if (screenshot) fd.append("screenshot", screenshot);
 
     startTransition(async () => {
@@ -97,18 +103,6 @@ export function UpiPaymentForm({ orderId, isResubmit, rejectionReason }: Props) 
           />
         </div>
 
-        {/* UPI ID copy */}
-        <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
-          <span className="text-white text-sm font-mono">{UPI_ID}</span>
-          <button
-            type="button"
-            onClick={handleCopyUpi}
-            className="text-[#5a5a5a] hover:text-[#c41e3a] transition-colors ml-2"
-            title="Copy UPI ID"
-          >
-            {copied ? <Check size={15} className="text-[#22c55e]" /> : <Copy size={15} />}
-          </button>
-        </div>
         <p className="text-[#3a3a3a] text-xs mt-2">
           Pay exactly <span className="text-white font-bold">₹{UPI_AMOUNT}</span> — no more, no less
         </p>
@@ -118,19 +112,30 @@ export function UpiPaymentForm({ orderId, isResubmit, rejectionReason }: Props) 
 
       {/* UTR Input */}
       <div className="mb-5">
-        <label htmlFor="utr-number" className="form-label">
-          UTR / Transaction ID <span className="text-[#c41e3a]">*</span>
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label htmlFor="utr-number" className="block text-[#a0a0a0] text-xs font-medium uppercase tracking-wide">
+            12-Digit UTR / Transaction ID <span className="text-[#c41e3a]">*</span>
+          </label>
+          <span className={`text-xs font-mono ${utr.length === 12 ? "text-[#22c55e] font-semibold" : "text-[#5a5a5a]"}`}>
+            {utr.length}/12 digits
+          </span>
+        </div>
         <input
           id="utr-number"
           type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={12}
           value={utr}
-          onChange={(e) => setUtr(e.target.value)}
-          className={`input-base ${error && utr.trim().length < 6 ? "border-[#c41e3a]/60" : ""}`}
+          onChange={handleUtrChange}
+          placeholder="e.g. 423456789012"
+          className={`input-base font-mono tracking-widest text-center text-base w-full ${
+            error ? "border-[#c41e3a]/60 bg-[rgba(196,30,58,0.03)]" : ""
+          }`}
           autoComplete="off"
         />
-        <p className="text-[#3a3a3a] text-xs mt-1.5">
-          Find it in your UPI app → Transaction Details
+        <p className="text-[#5a5a5a] text-xs mt-2 leading-relaxed">
+          GPay: <span className="text-[#a0a0a0]">UPI Transaction ID</span> · PhonePe: <span className="text-[#a0a0a0]">UTR</span> · Paytm: <span className="text-[#a0a0a0]">UPI Ref No.</span>
         </p>
       </div>
 
@@ -141,11 +146,10 @@ export function UpiPaymentForm({ orderId, isResubmit, rejectionReason }: Props) 
         </label>
         <div
           onClick={() => fileRef.current?.click()}
-          className={`mt-2 rounded-xl border-2 border-dashed cursor-pointer transition-all p-5 text-center ${
-            screenshot
+          className={`mt-2 rounded-xl border-2 border-dashed cursor-pointer transition-all p-5 text-center ${screenshot
               ? "border-[#c41e3a]/40 bg-[rgba(196,30,58,0.04)]"
               : "border-[#2a2a2a] hover:border-[#3a3a3a] bg-[#0e0e0e]"
-          }`}
+            }`}
         >
           {previewUrl ? (
             <div className="flex flex-col items-center gap-2">
@@ -179,14 +183,14 @@ export function UpiPaymentForm({ orderId, isResubmit, rejectionReason }: Props) 
       {error && (
         <div className="flex items-start gap-2 mb-4 p-3 rounded-xl bg-[rgba(196,30,58,0.08)] border border-[rgba(196,30,58,0.2)] text-[#c41e3a]">
           <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
-          <p className="text-sm">{error}</p>
+          <p className="text-xs leading-relaxed">{error}</p>
         </div>
       )}
 
       {/* Submit */}
       <button
         type="submit"
-        disabled={isPending || utr.trim().length < 6}
+        disabled={isPending || utr.length !== 12}
         className="btn-primary w-full justify-center text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed"
         id="submit-utr"
       >

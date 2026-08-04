@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/dal";
 import { prisma } from "@/services/prisma";
 import { getSupabaseAdmin, DIET_BUCKET } from "@/services/supabase";
+import { isAdminEmail } from "@/lib/utils";
 import type { AdminStats, OrderWithDetails } from "@/types";
 
 // ── getAdminStatsAction ───────────────────────────────────────────────────
@@ -17,7 +18,7 @@ export async function getAdminStatsAction(): Promise<AdminStats> {
 
   const [
     totalOrders,
-    totalRevenueResult,
+    verifiedOrders,
     ordersToday,
     pendingVerification,
     dietInProgress,
@@ -25,7 +26,18 @@ export async function getAdminStatsAction(): Promise<AdminStats> {
     totalUsers,
   ] = await Promise.all([
     prisma.order.count(),
-    prisma.order.aggregate({ _sum: { amountInPaise: true } }),
+    prisma.order.findMany({
+      where: {
+        OR: [
+          { status: { in: ["PAYMENT_VERIFIED", "DIET_IN_PROGRESS", "DIET_PUBLISHED"] } },
+          { payment: { status: "VERIFIED" } },
+        ],
+      },
+      select: {
+        amountInPaise: true,
+        payment: { select: { amountInPaise: true } },
+      },
+    }),
     prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
     prisma.order.count({ where: { status: "PAYMENT_PENDING" } }),
     prisma.order.count({ where: { status: { in: ["PAYMENT_VERIFIED", "DIET_IN_PROGRESS"] } } }),
@@ -33,9 +45,14 @@ export async function getAdminStatsAction(): Promise<AdminStats> {
     prisma.user.count(),
   ]);
 
+  const totalRevenue = verifiedOrders.reduce((sum, o) => {
+    const amt = o.amountInPaise || o.payment?.amountInPaise || 1900;
+    return sum + amt;
+  }, 0);
+
   return {
     totalOrders,
-    totalRevenue: totalRevenueResult._sum.amountInPaise ?? 0,
+    totalRevenue,
     ordersToday,
     pendingVerification,
     dietInProgress,
@@ -286,5 +303,135 @@ export async function updateOrderStatusAction(
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+// ── getAllUsersAction ──────────────────────────────────────────────────────
+
+export async function getAllUsersAction() {
+  await requireAdmin();
+
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      supabaseId: true,
+      createdAt: true,
+      updatedAt: true,
+      _count: {
+        select: { orders: true },
+      },
+    },
+  });
+
+  return users;
+}
+
+// ── updateUserAction ───────────────────────────────────────────────────────
+
+export async function updateUserAction(
+  userId: string,
+  data: { name?: string; role?: "USER" | "ADMIN"; email?: string }
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return { success: false, error: "User not found." };
+
+    const updateData: { name?: string; role?: "USER" | "ADMIN"; email?: string } = {};
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.role !== undefined) updateData.role = data.role;
+    if (data.email !== undefined && data.email.trim()) updateData.email = data.email.trim().toLowerCase();
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    if (user.supabaseId) {
+      try {
+        const admin = getSupabaseAdmin();
+        await admin.auth.admin.updateUserById(user.supabaseId, {
+          ...(data.name ? { user_metadata: { name: data.name.trim() } } : {}),
+          ...(data.email ? { email: data.email.trim().toLowerCase() } : {}),
+        });
+      } catch (err) {
+        console.warn("[updateUserAction] Supabase update warning:", err);
+      }
+    }
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update user.";
+    return { success: false, error: message };
+  }
+}
+
+// ── deleteUserAction ───────────────────────────────────────────────────────
+
+export async function deleteUserAction(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return { success: false, error: "User not found." };
+
+    if (user.role === "ADMIN" || isAdminEmail(user.email)) {
+      return { success: false, error: "Admin accounts cannot be deleted." };
+    }
+
+    if (user.supabaseId) {
+      try {
+        const admin = getSupabaseAdmin();
+        await admin.auth.admin.deleteUser(user.supabaseId);
+      } catch (err) {
+        console.warn("[deleteUserAction] Supabase delete warning:", err);
+      }
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete user.";
+    return { success: false, error: message };
+  }
+}
+
+// ── deleteOrderAction ──────────────────────────────────────────────────────
+
+export async function deleteOrderAction(
+  orderId: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, dietFile: { select: { supabasePath: true } } },
+    });
+
+    if (!order) return { success: false, error: "Order not found." };
+
+    if (order.dietFile?.supabasePath) {
+      try {
+        await getSupabaseAdmin().storage.from(DIET_BUCKET).remove([order.dietFile.supabasePath]);
+      } catch {
+        // ignore storage deletion errors
+      }
+    }
+
+    await prisma.order.delete({ where: { id: orderId } });
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete order.";
+    return { success: false, error: message };
   }
 }

@@ -22,6 +22,7 @@ export function SignupForm() {
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSignup() {
@@ -39,6 +40,7 @@ export function SignupForm() {
 
     startTransition(async () => {
       setError(null);
+      setSuccessMsg(null);
 
       try {
         const res = await signUpUserAction(name, email, pin);
@@ -48,8 +50,19 @@ export function SignupForm() {
           return;
         }
 
-        const destination = res.user.role === "ADMIN" ? ROUTES.admin : redirectTo;
-        router.replace(destination);
+        if (res.message) {
+          // Email verification required
+          setSuccessMsg(res.message);
+          // Optional: clear form
+          if (pinRef.current) pinRef.current.value = "";
+          if (confirmPinRef.current) confirmPinRef.current.value = "";
+          return;
+        }
+
+        if (res.user) {
+          const destination = res.user.role === "ADMIN" ? ROUTES.admin : redirectTo;
+          router.replace(destination);
+        }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Signup failed. Please try again.";
         setError(msg);
@@ -62,14 +75,50 @@ export function SignupForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080808] flex flex-col">
-      <div className="p-6">
-        <Logo size={40} />
+    <div className="min-h-screen bg-[#080808] flex flex-col md:flex-row relative overflow-hidden">
+      {/* Background Image for mobile/tablet */}
+      <div
+        className="absolute inset-0 bg-cover bg-center opacity-20 md:hidden pointer-events-none"
+        style={{ backgroundImage: `url('/auth-bg-car-workout.png')` }}
+      />
+
+      {/* Desktop Left Side Banner with Car-Engine Gym Image */}
+      <div className="hidden md:flex md:w-1/2 lg:w-3/5 relative bg-[#080808] flex-col justify-between p-12 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-65 transition-transform duration-700 hover:scale-105"
+          style={{ backgroundImage: `url('/auth-bg-car-workout.png')` }}
+        />
+        {/* Soft edge blend overlays */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/30 to-[#080808]/80 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#080808]/50 via-transparent to-[#080808] pointer-events-none" />
+
+        <div className="relative z-10">
+          <Logo size={44} />
+        </div>
+
+        <div className="relative z-10 max-w-xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#c41e3a]/20 border border-[#c41e3a]/40 text-[#c41e3a] text-xs font-semibold uppercase tracking-wider mb-4">
+            Engineered Excellence
+          </div>
+          <h2 className="text-white font-black text-3xl lg:text-4xl tracking-tight leading-tight mb-3">
+            RAW POWER. <br />
+            <span className="text-[#c41e3a]">PURE PRECISION.</span>
+          </h2>
+          <p className="text-[#a0a0a0] text-sm leading-relaxed">
+            Create your account to unlock your customized Indian diet plan delivered directly to your dashboard.
+          </p>
+        </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-sm">
-          <div className="rounded-2xl border border-[#1e1e1e] bg-[#141414] p-8">
+      {/* Right Side Form Container */}
+      <div className="flex-1 flex flex-col justify-between p-6 md:p-12 relative z-10 bg-[#080808]/90 md:bg-[#080808] backdrop-blur-md md:backdrop-blur-none">
+        <div className="md:hidden mb-6">
+          <Logo size={40} />
+        </div>
+
+        <div className="my-auto w-full max-w-sm mx-auto">
+          {/* Card */}
+          <div className="rounded-2xl border border-[#1e1e1e] bg-[#141414]/90 md:bg-[#141414] p-8 shadow-2xl">
             <h1 className="text-white font-bold text-2xl mb-1">Create Account</h1>
             <p className="text-[#5a5a5a] text-sm mb-6">
               Enter your details and choose a 6-digit Pass PIN.
@@ -177,6 +226,14 @@ export function SignupForm() {
               <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-[rgba(196,30,58,0.08)] border border-[rgba(196,30,58,0.2)]">
                 <AlertCircle size={14} className="text-[#c41e3a] mt-0.5 flex-shrink-0" />
                 <p className="text-[#c41e3a] text-xs">{error}</p>
+              </div>
+            )}
+
+            {/* Success */}
+            {successMsg && (
+              <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.2)]">
+                <AlertCircle size={14} className="text-green-500 mt-0.5 flex-shrink-0" />
+                <p className="text-green-500 text-xs">{successMsg}</p>
               </div>
             )}
 

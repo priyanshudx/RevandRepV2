@@ -10,48 +10,34 @@ import type { AuthUser } from "@/types";
 // ── signUpUserAction ──────────────────────────────────────────────────────
 
 /**
- * Creates and auto-confirms a user in Supabase Auth using the Admin SDK,
- * creates their record in Prisma Postgres DB, and sets the HttpOnly session cookie.
+ * Creates a user in Supabase Auth,
+ * creates their record in Prisma Postgres DB, and sets the HttpOnly session cookie if auto-confirmed.
  */
 export async function signUpUserAction(
   name: string,
   email: string,
   pin: string
-): Promise<{ success: true; user: AuthUser } | { success: false; error: string }> {
+): Promise<{ success: true; user?: AuthUser; message?: string } | { success: false; error: string }> {
   try {
-    const admin = getSupabaseAdmin();
     const cleanEmail = email.trim().toLowerCase();
+    const { getSupabase } = await import("@/services/supabase");
+    const supabase = getSupabase();
 
-    // 1. Create user in Supabase Auth with auto-confirmed email
-    const { data: createdData, error: createErr } = await admin.auth.admin.createUser({
+    const { data: createdData, error: createErr } = await supabase.auth.signUp({
       email: cleanEmail,
       password: pin,
-      email_confirm: true,
-      user_metadata: { name: name.trim() },
+      options: {
+        data: { name: name.trim() },
+      },
     });
 
     let supabaseId = createdData?.user?.id;
 
     if (createErr || !supabaseId) {
-      // If user already exists in Supabase Auth, check if they exist and update password/confirm email
-      const { data: listData } = await admin.auth.admin.listUsers();
-      const existingUser = listData.users.find(
-        (u) => u.email?.toLowerCase() === cleanEmail
-      );
-
-      if (existingUser) {
-        supabaseId = existingUser.id;
-        await admin.auth.admin.updateUserById(supabaseId, {
-          password: pin,
-          email_confirm: true,
-          user_metadata: { name: name.trim() },
-        });
-      } else {
-        return {
-          success: false,
-          error: createErr?.message ?? "Failed to create account. Please try again.",
-        };
+      if (createErr) {
+        return { success: false, error: createErr.message };
       }
+      return { success: false, error: "Failed to create account. Please try again." };
     }
 
     // 2. Determine role
@@ -81,19 +67,25 @@ export async function signUpUserAction(
       },
     });
 
-    // 4. Create HttpOnly session cookie
-    await createSession(user.id, user.role, user.email);
-
-    return {
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-        supabaseId: user.supabaseId,
-      },
-    };
+    if (createdData.session) {
+      // 4. Create HttpOnly session cookie
+      await createSession(user.id, user.role, user.email);
+      return {
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name: user.name,
+          supabaseId: user.supabaseId,
+        },
+      };
+    } else {
+      return {
+        success: true,
+        message: "Please check your email to verify your account.",
+      };
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Signup failed.";
     console.error("[signUpUserAction]", message);
@@ -183,30 +175,29 @@ export async function verifySupabaseTokenAction(
 // ── loginUserWithPinAction ────────────────────────────────────────────────
 
 /**
- * Server-side login helper that auto-confirms user's email if unconfirmed
- * before attempting login.
+ * Server-side login helper.
  */
 export async function loginUserWithPinAction(
   email: string,
   pin: string
 ): Promise<{ success: true; user: AuthUser } | { success: false; error: string }> {
   try {
-    const admin = getSupabaseAdmin();
     const cleanEmail = email.trim().toLowerCase();
 
-    // Auto-confirm user email if it exists in Supabase Auth but is not confirmed yet
-    const { data: listData } = await admin.auth.admin.listUsers();
-    const existingUser = listData.users.find(
-      (u) => u.email?.toLowerCase() === cleanEmail
-    );
+    // 1. Fast indexed database check (~2ms)
+    const existingDbUser = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+      select: { id: true },
+    });
 
-    if (existingUser && !existingUser.email_confirmed_at) {
-      await admin.auth.admin.updateUserById(existingUser.id, {
-        email_confirm: true,
-      });
+    if (!existingDbUser) {
+      return {
+        success: false,
+        error: "Your account is not registered. Please create an account.",
+      };
     }
 
-    // Now verify credentials by signing in
+    // 2. Verify credentials by signing in via Supabase
     const { getSupabase } = await import("@/services/supabase");
     const { data, error } = await getSupabase().auth.signInWithPassword({
       email: cleanEmail,
@@ -214,9 +205,17 @@ export async function loginUserWithPinAction(
     });
 
     if (error || !data.session) {
+      const errMsg = error?.message?.toLowerCase() ?? "";
+      if (errMsg.includes("email not confirmed") || errMsg.includes("not confirmed")) {
+        return {
+          success: false,
+          error: "Please verify your email address before signing in.",
+        };
+      }
+
       return {
         success: false,
-        error: error?.message ?? "Invalid email or 6-digit Pass PIN.",
+        error: "Incorrect 6-digit Pass PIN. Please try again.",
       };
     }
 

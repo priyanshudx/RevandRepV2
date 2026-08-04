@@ -27,9 +27,9 @@ export const BRAND = {
     gray: "#a0a0a0",
     white: "#f5f5f5",
   },
+  supportEmail: "Sstudy751@gmail.com",
   social: {
     instagram: "https://instagram.com/revandrep",
-    whatsapp: "https://wa.me/919999999999",
   },
 } as const;
 

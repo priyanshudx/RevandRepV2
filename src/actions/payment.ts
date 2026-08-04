@@ -30,8 +30,39 @@ export async function submitUpiPaymentAction(formData: FormData): Promise<{
   if (typeof orderId !== "string" || !orderId.trim()) {
     return { success: false, error: "Missing order ID." };
   }
-  if (typeof utrNumber !== "string" || utrNumber.trim().length < 6) {
-    return { success: false, error: "Please enter a valid UTR number (at least 6 characters)." };
+
+  if (typeof utrNumber !== "string" || !utrNumber.trim()) {
+    return { success: false, error: "Please enter your 12-digit UTR / Transaction ID." };
+  }
+
+  const cleanUtr = utrNumber.replace(/\s+/g, "").trim();
+
+  // Validate UTR format: standard UPI UTR is 12 digits
+  if (!/^\d+$/.test(cleanUtr)) {
+    return { success: false, error: "UTR / Transaction ID must contain numbers only." };
+  }
+
+  if (cleanUtr.length !== 12) {
+    return {
+      success: false,
+      error: `Standard UPI UTR number must be exactly 12 digits (you entered ${cleanUtr.length} digits). Please check your UPI app receipt.`,
+    };
+  }
+
+  // Check if this UTR was already used for another order
+  const duplicatePayment = await prisma.payment.findFirst({
+    where: {
+      utrNumber: cleanUtr,
+      orderId: { not: orderId.trim() },
+    },
+    select: { id: true },
+  });
+
+  if (duplicatePayment) {
+    return {
+      success: false,
+      error: "This UTR / Transaction ID has already been submitted for another order. Please check your transaction details.",
+    };
   }
 
   // Verify the order belongs to this user and is in the right state
@@ -39,13 +70,21 @@ export async function submitUpiPaymentAction(formData: FormData): Promise<{
     where: {
       id: orderId.trim(),
       userId: session.userId,
-      status: { in: ["QUESTIONNAIRE_SUBMITTED", "PAYMENT_REJECTED"] },
     },
-    select: { id: true, amountInPaise: true, payment: { select: { id: true } } },
+    select: { id: true, status: true, amountInPaise: true, payment: { select: { id: true } } },
   });
 
   if (!order) {
-    return { success: false, error: "Order not found or already submitted." };
+    return { success: false, error: "Order not found." };
+  }
+
+  if (
+    order.status === "PAYMENT_PENDING" ||
+    order.status === "PAYMENT_VERIFIED" ||
+    order.status === "DIET_IN_PROGRESS" ||
+    order.status === "DIET_PUBLISHED"
+  ) {
+    return { success: false, error: "Payment for this order has already been submitted." };
   }
 
   // Upload screenshot if provided

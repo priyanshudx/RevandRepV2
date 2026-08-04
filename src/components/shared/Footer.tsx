@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Share2, MessageCircle } from "lucide-react";
-import { APP_NAME, APP_TAGLINE, ROUTES } from "@/lib/constants";
+import { Share2, Mail } from "lucide-react";
+import { APP_NAME, APP_TAGLINE, BRAND, ROUTES } from "@/lib/constants";
 import { Logo } from "@/components/shared/Logo";
 
 const footerLinks = {
@@ -48,13 +48,12 @@ export function Footer() {
                 <Share2 size={16} />
               </a>
               <a
-                href="https://wa.me/919999999999"
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`mailto:${BRAND.supportEmail}`}
                 className="w-9 h-9 rounded-lg border border-[#2a2a2a] flex items-center justify-center text-[#5a5a5a] hover:text-white hover:border-[#3d3d3d] transition-colors"
-                aria-label="WhatsApp"
+                aria-label="Email Support"
+                title={`Email: ${BRAND.supportEmail}`}
               >
-                <MessageCircle size={16} />
+                <Mail size={16} />
               </a>
             </div>
           </div>

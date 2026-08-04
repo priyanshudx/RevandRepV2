@@ -12,6 +12,7 @@ import {
   Clock,
   FileText,
   Save,
+  Trash2,
 } from "lucide-react";
 import { formatDate, formatPhone, enumToLabel } from "@/lib/utils";
 import {
@@ -19,6 +20,7 @@ import {
   rejectPaymentAction,
   saveDietDraftAction,
   uploadDietFileAction,
+  deleteOrderAction,
 } from "@/actions/admin";
 import type { OrderWithDetails } from "@/types";
 
@@ -49,15 +51,34 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   },
 };
 
-function DietRequestRow({ order: initialOrder }: { order: OrderWithDetails }) {
+function DietRequestRow({
+  order: initialOrder,
+  onDelete,
+}: {
+  order: OrderWithDetails;
+  onDelete?: (orderId: string) => void;
+}) {
   const [order, setOrder] = useState(initialOrder);
   const [expanded, setExpanded] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectForm, setShowRejectForm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dietContent, setDietContent] = useState(order.dietContent ?? "");
   const [stagedFile, setStagedFile] = useState<File | null>(null);
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  function handleDeleteOrder() {
+    startTransition(async () => {
+      const res = await deleteOrderAction(order.id);
+      if (res.success) {
+        if (onDelete) onDelete(order.id);
+      } else {
+        showMsg("error", res.error ?? "Failed to delete order.");
+        setShowDeleteConfirm(false);
+      }
+    });
+  }
 
   function showMsg(type: "success" | "error", text: string) {
     setMsg({ type, text });
@@ -191,12 +212,51 @@ function DietRequestRow({ order: initialOrder }: { order: OrderWithDetails }) {
         >
           {badge.label}
         </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDeleteConfirm((v) => !v);
+          }}
+          className="btn-ghost p-1.5 text-[#5a5a5a] hover:text-[#c41e3a] hover:bg-[rgba(196,30,58,0.1)] transition-colors flex-shrink-0 rounded-lg"
+          title="Delete Order"
+        >
+          <Trash2 size={15} />
+        </button>
         {expanded ? (
           <ChevronUp size={16} className="text-[#5a5a5a] flex-shrink-0" />
         ) : (
           <ChevronDown size={16} className="text-[#5a5a5a] flex-shrink-0" />
         )}
       </div>
+
+      {/* Delete confirmation banner */}
+      {showDeleteConfirm && (
+        <div className="bg-[rgba(196,30,58,0.08)] border-t border-b border-[rgba(196,30,58,0.2)] p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[#c41e3a] text-xs font-medium">
+            <AlertCircle size={15} />
+            <span>Are you sure you want to delete this order permanently?</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(false)}
+              className="btn-ghost py-1 px-3 text-xs"
+              disabled={isPending}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteOrder}
+              disabled={isPending}
+              className="btn-primary py-1 px-3 text-xs bg-[#c41e3a] hover:bg-[#a0182e] justify-center"
+            >
+              {isPending ? <Loader2 size={13} className="animate-spin" /> : "Yes, Delete Order"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Expanded detail */}
       {expanded && (
@@ -533,7 +593,8 @@ function DietRequestRow({ order: initialOrder }: { order: OrderWithDetails }) {
   );
 }
 
-export function DietRequestsTable({ orders }: { orders: OrderWithDetails[] }) {
+export function DietRequestsTable({ orders: initialOrders }: { orders: OrderWithDetails[] }) {
+  const [orders, setOrders] = useState(initialOrders);
   const [filter, setFilter] = useState<string>("ALL");
 
   const filters = [
@@ -546,6 +607,10 @@ export function DietRequestsTable({ orders }: { orders: OrderWithDetails[] }) {
 
   const filtered =
     filter === "ALL" ? orders : orders.filter((o) => o.status === filter);
+
+  function handleOrderDeleted(deletedId: string) {
+    setOrders((prev) => prev.filter((o) => o.id !== deletedId));
+  }
 
   return (
     <div>
@@ -578,7 +643,7 @@ export function DietRequestsTable({ orders }: { orders: OrderWithDetails[] }) {
       ) : (
         <div>
           {filtered.map((order) => (
-            <DietRequestRow key={order.id} order={order} />
+            <DietRequestRow key={order.id} order={order} onDelete={handleOrderDeleted} />
           ))}
         </div>
       )}
