@@ -95,7 +95,7 @@ export default async function DashboardPage() {
                       {latestPublished.questionnaire.fitnessGoal
                         .replace(/_/g, " ")
                         .toLowerCase()
-                        .replace(/\b\w/g, (c) => c.toUpperCase())}
+                        .replace(/\b\w/g, (c: string) => c.toUpperCase())}
                     </p>
                   )}
                 </div>
@@ -140,7 +140,7 @@ export default async function DashboardPage() {
                   ? order.questionnaire.fitnessGoal
                       .replace(/_/g, " ")
                       .toLowerCase()
-                      .replace(/\b\w/g, (c) => c.toUpperCase()) + " Plan"
+                      .replace(/\b\w/g, (c: string) => c.toUpperCase()) + " Plan"
                   : "Diet Plan";
 
                 return (

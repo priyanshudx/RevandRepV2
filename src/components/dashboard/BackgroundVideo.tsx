@@ -19,7 +19,7 @@ export function BackgroundVideo({
     if (videoRef.current) {
       videoRef.current.defaultMuted = true;
       videoRef.current.muted = true;
-      videoRef.current.play().catch((err) => {
+      videoRef.current.play().catch((err: unknown) => {
         console.warn("Autoplay error:", err);
       });
     }
