@@ -3,7 +3,7 @@
  *
  * Prisma 7 uses driver adapters (@prisma/adapter-pg + pg Pool).
  * SSL settings rejectUnauthorized: false ensures seamless connection with Supabase Pooler.
- * Lazy getter pattern prevents premature client instantiation before env variables are loaded.
+ * max: 1 limits connection pool size per serverless container to prevent (EMAXCONNSESSION) errors.
  */
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -15,7 +15,7 @@ const globalForPrisma = globalThis as unknown as {
 
 export function getPrisma(): PrismaClient {
   if (!globalForPrisma.prisma) {
-    const connectionString = process.env.DATABASE_URL;
+    const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
     if (!connectionString) {
       throw new Error("DATABASE_URL environment variable is not set.");
     }
@@ -23,23 +23,19 @@ export function getPrisma(): PrismaClient {
     const pool = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
+      max: 1,
+      idleTimeoutMillis: 10000,
     });
 
     const adapter = new PrismaPg(pool);
 
-    const client = new PrismaClient({
+    globalForPrisma.prisma = new PrismaClient({
       adapter,
       log:
         process.env.NODE_ENV === "development"
           ? ["query", "error", "warn"]
           : ["error"],
     });
-
-    if (process.env.NODE_ENV !== "production") {
-      globalForPrisma.prisma = client;
-    } else {
-      return client;
-    }
   }
 
   return globalForPrisma.prisma;
