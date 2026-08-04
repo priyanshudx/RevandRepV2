@@ -1,0 +1,218 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum FitnessGoal {
+  WEIGHT_LOSS
+  WEIGHT_GAIN
+  MUSCLE_GAIN
+  FAT_LOSS
+  HEALTHY_LIFESTYLE
+  PCOS
+  DIABETES
+  THYROID
+}
+
+enum FoodPreference {
+  VEGETARIAN
+  EGGETARIAN
+  NON_VEGETARIAN
+  VEGAN
+  JAIN
+}
+
+enum ExerciseType {
+  NONE
+  WALKING
+  RUNNING
+  GYM
+  YOGA
+  HOME_WORKOUT
+}
+
+enum WorkType {
+  STUDENT
+  OFFICE
+  WORK_FROM_HOME
+}
+
+// ── Order Status Timeline ─────────────────────────────────────────────────
+// QUESTIONNAIRE_SUBMITTED → PAYMENT_PENDING → PAYMENT_VERIFIED
+//   → DIET_IN_PROGRESS → DIET_PUBLISHED
+// PAYMENT_REJECTED loops back to PAYMENT_PENDING (user resubmits)
+enum OrderStatus {
+  QUESTIONNAIRE_SUBMITTED
+  PAYMENT_PENDING
+  PAYMENT_VERIFIED
+  PAYMENT_REJECTED
+  DIET_IN_PROGRESS
+  DIET_PUBLISHED
+}
+
+// ── Payment Verification Status ───────────────────────────────────────────
+// Manual UPI flow: PENDING_VERIFICATION → VERIFIED or REJECTED
+// REJECTED → RESUBMITTED → PENDING_VERIFICATION again
+enum PaymentStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  RESUBMITTED
+}
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  supabaseId String   @unique @map("supabase_id")
+  name       String?
+  role       Role     @default(USER)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  orders         Order[]
+  questionnaires Questionnaire[]
+
+  @@index([email])
+  @@index([supabaseId])
+  @@map("users")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  userId        String      @map("user_id")
+  status        OrderStatus @default(QUESTIONNAIRE_SUBMITTED)
+  amountInPaise Int         @map("amount_in_paise")
+
+  // Diet content — admin writes/saves this before publishing
+  dietContent     String?   @map("diet_content")
+  dietPublishedAt DateTime? @map("diet_published_at")
+
+  // Razorpay — optional, null for manual UPI; populated when migrating to Razorpay
+  razorpayOrderId String? @unique @map("razorpay_order_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment       Payment?
+  questionnaire Questionnaire?
+  dietFile      DietFile?
+
+  @@index([userId])
+  @@index([status])
+  @@map("orders")
+}
+
+model Questionnaire {
+  id      String @id @default(cuid())
+  userId  String @map("user_id")
+  orderId String @unique @map("order_id")
+
+  // Personal
+  name     String
+  age      Int
+  gender   Gender
+  heightCm Int    @map("height_cm")
+  weightKg Float  @map("weight_kg")
+  city     String
+  state    String
+
+  // Goals & preferences
+  fitnessGoal    FitnessGoal    @map("fitness_goal")
+  foodPreference FoodPreference @map("food_preference")
+
+  // Multi-select fields stored as arrays
+  stapleFoods       String[] @map("staple_foods")
+  proteinSources    String[] @map("protein_sources")
+  vegetables        String[]
+  fruits            String[]
+  snacks            String[]
+  drinks            String[]
+  medicalConditions String[] @map("medical_conditions")
+
+  // Routine
+  wakeUpTime  String      @map("wake_up_time")
+  sleepTime   String      @map("sleep_time")
+  workTimings String      @map("work_timings")
+  workType    WorkType    @map("work_type")
+  exercise    ExerciseType
+
+  // Free text
+  allergies       String?
+  favouriteFoods  String? @map("favourite_foods")
+  hatedFoods      String? @map("hated_foods")
+  additionalNotes String? @map("additional_notes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orderId])
+  @@map("questionnaires")
+}
+
+// ── Manual UPI Payment ────────────────────────────────────────────────────
+// Admin verifies manually. Future: add razorpayPaymentId for gateway migration.
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String        @unique @map("order_id")
+  utrNumber     String        @map("utr_number")
+  screenshotPath String?      @map("screenshot_path") // Supabase storage path (optional)
+  amountInPaise Int           @map("amount_in_paise")
+  status        PaymentStatus @default(PENDING_VERIFICATION)
+  rejectionReason String?     @map("rejection_reason")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([utrNumber])
+  @@map("payments")
+}
+
+model DietFile {
+  id               String   @id @default(cuid())
+  orderId          String   @unique @map("order_id")
+  supabasePath     String   @map("supabase_path")
+  originalFileName String   @map("original_file_name")
+  mimeType         String   @map("mime_type")
+  sizeBytes        Int      @map("size_bytes")
+  uploadedAt       DateTime @default(now()) @map("uploaded_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("diet_files")
+}
