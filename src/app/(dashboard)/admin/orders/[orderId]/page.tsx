@@ -129,7 +129,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   if (!order) redirect(ROUTES.admin);
 
-  const sc = statusConfig[order.status];
+  const sc =
+    statusConfig[order.status as keyof typeof statusConfig] ??
+    statusConfig["QUESTIONNAIRE_SUBMITTED"];
   const q = order.questionnaire;
 
   return (
@@ -162,7 +164,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           <span
             className={`badge text-sm px-3 py-1.5 ${sc.bg} ${sc.color} border ${sc.border}`}
           >
-            {ORDER_STATUS_LABELS[order.status]}
+            {ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS] ?? order.status}
           </span>
         </div>
 
