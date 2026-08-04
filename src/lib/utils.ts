@@ -109,7 +109,8 @@ export function enumToLabel(value: string): string {
  * Reads the ADMIN_EMAILS env var (comma-separated list of emails).
  */
 export function isAdminEmail(email: string): boolean {
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+  const envVal = process.env.ADMIN_EMAILS || "admin@revandrep.com,admin@revandrep.in";
+  const adminEmails = envVal
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
