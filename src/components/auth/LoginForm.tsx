@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, ArrowRight, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { ROUTES } from "@/lib/constants";
 import { Logo } from "@/components/shared/Logo";
 import { loginSchema } from "@/lib/validations";
@@ -13,6 +13,7 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") ?? ROUTES.dashboard;
+  const isResetSuccess = searchParams.get("reset") === "success";
 
   const emailRef = useRef<HTMLInputElement>(null);
   const pinRef = useRef<HTMLInputElement>(null);
@@ -164,6 +165,14 @@ export function LoginForm() {
                 </button>
               </div>
             </div>
+
+            {/* Success Notification after Reset */}
+            {isResetSuccess && (
+              <div className="flex items-start gap-2 my-4 p-3 rounded-lg bg-[rgba(34,197,94,0.08)] border border-[rgba(34,197,94,0.2)] text-[#22c55e]">
+                <CheckCircle size={14} className="mt-0.5 flex-shrink-0" />
+                <p className="text-xs">Pass PIN updated successfully! Please sign in with your new PIN.</p>
+              </div>
+            )}
 
             {/* Error */}
             {error && (

@@ -23,12 +23,22 @@ export default function AuthCallbackPage() {
         const { getSupabase } = await import("@/services/supabase");
         const supabase = getSupabase();
 
+        // Check if this callback is for password recovery
+        const typeParam = searchParams.get("type");
+        const nextParam = searchParams.get("next");
+        const isRecovery = typeParam === "recovery" || nextParam?.includes("reset-pin");
+
         // 1. Check if there's a code parameter in the URL query string
         const code = searchParams.get("code");
         if (code) {
           const { data, error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
           if (exchangeErr || !data.session) {
-            if (mounted) setError(exchangeErr?.message ?? "Failed to verify magic link.");
+            if (mounted) setError(exchangeErr?.message ?? "Failed to verify reset link.");
+            return;
+          }
+
+          if (isRecovery) {
+            router.replace(ROUTES.resetPin);
             return;
           }
 
@@ -49,6 +59,11 @@ export default function AuthCallbackPage() {
           // Listen to onAuthStateChange for hash fragment token parsing
           const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session?.access_token) {
+              if (event === "PASSWORD_RECOVERY" || isRecovery) {
+                router.replace(ROUTES.resetPin);
+                return;
+              }
+
               const res = await verifySupabaseTokenAction(session.access_token);
               if (res.success) {
                 const target = res.user.role === "ADMIN" ? ROUTES.admin : redirectTo;

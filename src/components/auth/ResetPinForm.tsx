@@ -56,7 +56,7 @@ export function ResetPinForm() {
         const supabase = getSupabase();
 
         // Update the password in Supabase Auth to the new 6-digit PIN
-        const { data, error: updateErr } = await supabase.auth.updateUser({
+        const { error: updateErr } = await supabase.auth.updateUser({
           password: pin,
         });
 
@@ -65,15 +65,12 @@ export function ResetPinForm() {
           return;
         }
 
-        // If session exists, sync session cookie with server
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session?.access_token) {
-          await verifySupabaseTokenAction(sessionData.session.access_token);
-        }
+        // Sign out recovery session cleanly so user logs in with new credentials
+        await supabase.auth.signOut();
 
         setSuccess(true);
         setTimeout(() => {
-          router.replace(ROUTES.dashboard);
+          router.replace(`${ROUTES.login}?reset=success`);
         }, 2000);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Failed to reset Pass PIN.";
@@ -187,12 +184,16 @@ export function ResetPinForm() {
                 </button>
               </>
             ) : (
-              <>
-                <h1 className="text-white font-bold text-2xl mb-1">Pass PIN Reset!</h1>
-                <p className="text-[#a0a0a0] text-sm mb-4">
-                  Your 6-digit Pass PIN has been updated successfully. Redirecting you to your dashboard…
+              <div className="text-center py-4">
+                <div className="w-12 h-12 rounded-full bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.2)] flex items-center justify-center mx-auto text-[#22c55e] mb-4">
+                  <CheckCircle size={24} />
+                </div>
+                <h1 className="text-white font-bold text-2xl mb-2">Pass PIN Updated!</h1>
+                <p className="text-[#a0a0a0] text-xs leading-relaxed mb-4">
+                  Your 6-digit Pass PIN has been updated successfully. Redirecting you to the sign-in page…
                 </p>
-              </>
+                <div className="w-6 h-6 rounded-full border-2 border-[#c41e3a] border-t-transparent animate-spin mx-auto mt-2" />
+              </div>
             )}
 
             <p className="text-center text-[#5a5a5a] text-xs mt-6">
