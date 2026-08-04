@@ -219,7 +219,19 @@ export async function loginUserWithPinAction(
       };
     }
 
-    return await verifySupabaseTokenAction(data.session.access_token);
+    const role = isAdminEmail(cleanEmail) ? ("ADMIN" as const) : ("USER" as const);
+
+    // 3. Create server session cookie directly (avoids redundant 2nd Supabase network roundtrip)
+    await createSession(existingDbUser.id, role, cleanEmail);
+
+    return {
+      success: true,
+      user: {
+        id: existingDbUser.id,
+        email: cleanEmail,
+        role,
+      },
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Login failed.";
     return { success: false, error: message };
