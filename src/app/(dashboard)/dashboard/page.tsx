@@ -7,7 +7,7 @@ import {
   Package,
 } from "lucide-react";
 import { ROUTES } from "@/lib/constants";
-import { formatPhone } from "@/lib/utils";
+import { formatPhone, enumToLabel } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/dal";
 import { getUserOrdersAction } from "@/actions/orders";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -91,11 +91,7 @@ export default async function DashboardPage() {
                   </h2>
                   {latestPublished.questionnaire && (
                     <p className="text-[#5a5a5a] text-sm">
-                      Goal:{" "}
-                      {latestPublished.questionnaire.fitnessGoal
-                        .replace(/_/g, " ")
-                        .toLowerCase()
-                        .replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                      Goal: {enumToLabel(latestPublished.questionnaire.fitnessGoal)}
                     </p>
                   )}
                 </div>
@@ -137,10 +133,7 @@ export default async function DashboardPage() {
             <div className="space-y-4">
               {orders.map((order: OrderWithDetails) => {
                 const goalLabel = order.questionnaire
-                  ? order.questionnaire.fitnessGoal
-                      .replace(/_/g, " ")
-                      .toLowerCase()
-                      .replace(/\b\w/g, (c: string) => c.toUpperCase()) + " Plan"
+                  ? enumToLabel(order.questionnaire.fitnessGoal) + " Plan"
                   : "Diet Plan";
 
                 return (
