@@ -179,23 +179,23 @@ export const INDIAN_STATES = [
   "Chandigarh",
 ] as const;
 
-export const ORDER_STATUS_LABELS = {
+export const ORDER_STATUS_LABELS: Record<string, string> = {
   QUESTIONNAIRE_SUBMITTED: "Questionnaire Done",
   PAYMENT_PENDING: "Payment Pending",
   PAYMENT_VERIFIED: "Payment Verified",
   PAYMENT_REJECTED: "Payment Rejected",
   DIET_IN_PROGRESS: "Diet In Progress",
   DIET_PUBLISHED: "Diet Ready",
-} as const;
+};
 
-export const ORDER_STATUS_COLORS = {
+export const ORDER_STATUS_COLORS: Record<string, string> = {
   QUESTIONNAIRE_SUBMITTED: "info",
   PAYMENT_PENDING: "warning",
   PAYMENT_VERIFIED: "success",
   PAYMENT_REJECTED: "error",
   DIET_IN_PROGRESS: "info",
   DIET_PUBLISHED: "success",
-} as const;
+};
 
 // UPI Payment Details — update these with your actual UPI credentials
 export const UPI_ID = "revandrep@ybl"; // ← Replace with your UPI ID

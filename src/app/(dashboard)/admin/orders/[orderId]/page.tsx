@@ -164,7 +164,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           <span
             className={`badge text-sm px-3 py-1.5 ${sc.bg} ${sc.color} border ${sc.border}`}
           >
-            {ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS] ?? order.status}
+            {ORDER_STATUS_LABELS[String(order.status)] ?? String(order.status)}
           </span>
         </div>
 
