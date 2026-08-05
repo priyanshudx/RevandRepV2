@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Upload, Filter, Search } from "lucide-react";
+import { Eye, Upload, Filter, Search, ExternalLink, Loader2 } from "lucide-react";
 import { UploadDietFileModal } from "@/components/admin/UploadDietFileModal";
 import { formatDate, formatCurrency, formatPhone, enumToLabel } from "@/lib/utils";
+import { getAdminDietFileDownloadUrlAction } from "@/actions/admin";
 import type { OrderWithDetails } from "@/types";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -29,6 +30,18 @@ export function AdminOrdersTable({ orders }: AdminOrdersTableProps) {
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [openingOrderId, setOpeningOrderId] = useState<string | null>(null);
+
+  function handleOpenDietPlan(orderId: string) {
+    setOpeningOrderId(orderId);
+    startTransition(async () => {
+      const res = await getAdminDietFileDownloadUrlAction(orderId);
+      setOpeningOrderId(null);
+      if (res.success && res.url) {
+        window.open(res.url, "_blank");
+      }
+    });
+  }
 
   const filteredOrders = orders.filter((order) => {
     const name = order.user.name ?? "";
@@ -193,6 +206,25 @@ export function AdminOrdersTable({ orders }: AdminOrdersTableProps) {
                           >
                             <Eye size={13} />
                           </a>
+
+                          {/* View published diet plan */}
+                          {order.status === "DIET_PUBLISHED" && order.dietFile && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDietPlan(order.id)}
+                              disabled={openingOrderId === order.id}
+                              className="btn-primary py-1 px-2.5 text-xs bg-[#22c55e] hover:bg-[#16a34a]"
+                              title="View Published Diet Plan PDF"
+                              id={`view-published-pdf-table-${order.id}`}
+                            >
+                              {openingOrderId === order.id ? (
+                                <Loader2 size={13} className="animate-spin" />
+                              ) : (
+                                <ExternalLink size={13} />
+                              )}
+                              View Diet
+                            </button>
+                          )}
 
                           {/* Upload diet plan */}
                           {order.status !== "DIET_PUBLISHED" && (

@@ -15,6 +15,7 @@ import { requireAdmin } from "@/lib/dal";
 import { prisma } from "@/services/prisma";
 import { formatDate, formatPhone, formatCurrency, enumToLabel } from "@/lib/utils";
 import { ORDER_STATUS_LABELS, ROUTES } from "@/lib/constants";
+import { AdminViewDietButton } from "@/components/admin/AdminViewDietButton";
 
 export const metadata: Metadata = {
   title: "Order Detail — Admin — Rev & Rep",
@@ -184,13 +185,45 @@ export default async function OrderDetailPage({ params }: PageProps) {
           )}
           {order.dietFile && (
             <InfoRow label="Diet File" value={
-              <span className="text-[#22c55e] flex items-center gap-1">
+              <span className="text-[#22c55e] flex items-center gap-1 font-mono text-xs">
                 <CheckCircle size={13} />
                 {order.dietFile.originalFileName}
               </span>
             } />
           )}
         </Section>
+
+        {/* Given Diet Plan section */}
+        {(order.dietFile || order.dietContent || order.status === "DIET_PUBLISHED") && (
+          <Section icon={FileText} title="Given Diet Plan">
+            {order.dietFile && (
+              <InfoRow
+                label="Published PDF"
+                value={
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-1">
+                    <span className="font-mono text-xs text-[#22c55e]">
+                      {order.dietFile.originalFileName} ({(order.dietFile.sizeBytes / (1024 * 1024)).toFixed(2)} MB)
+                    </span>
+                    <AdminViewDietButton orderId={order.id} />
+                  </div>
+                }
+              />
+            )}
+            {order.dietPublishedAt && (
+              <InfoRow label="Published Date" value={formatDate(order.dietPublishedAt)} />
+            )}
+            {order.dietContent && (
+              <InfoRow
+                label="Draft Notes"
+                value={
+                  <div className="bg-[#0e0e0e] p-3 rounded-xl border border-[#1e1e1e] text-xs text-[#a0a0a0] whitespace-pre-wrap w-full">
+                    {order.dietContent}
+                  </div>
+                }
+              />
+            )}
+          </Section>
+        )}
 
         {/* User info */}
         <Section icon={User} title="Customer">

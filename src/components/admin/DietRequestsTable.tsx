@@ -13,6 +13,7 @@ import {
   FileText,
   Save,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { formatDate, formatPhone, enumToLabel } from "@/lib/utils";
 import {
@@ -21,6 +22,7 @@ import {
   saveDietDraftAction,
   uploadDietFileAction,
   deleteOrderAction,
+  getAdminDietFileDownloadUrlAction,
 } from "@/actions/admin";
 import type { OrderWithDetails } from "@/types";
 
@@ -67,6 +69,21 @@ function DietRequestRow({
   const [stagedFile, setStagedFile] = useState<File | null>(null);
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isOpeningFile, setIsOpeningFile] = useState(false);
+  const [showReplaceForm, setShowReplaceForm] = useState(false);
+
+  function handleViewPublishedDiet() {
+    setIsOpeningFile(true);
+    startTransition(async () => {
+      const res = await getAdminDietFileDownloadUrlAction(order.id);
+      setIsOpeningFile(false);
+      if (res.success && res.url) {
+        window.open(res.url, "_blank");
+      } else {
+        showMsg("error", res.error ?? "Failed to get download URL for published diet plan.");
+      }
+    });
+  }
 
   function handleDeleteOrder() {
     startTransition(async () => {
@@ -567,9 +584,124 @@ function DietRequestRow({
             )}
 
             {order.status === "DIET_PUBLISHED" && (
-              <div className="flex items-center gap-2 text-[#22c55e] text-sm">
-                <CheckCircle size={16} />
-                Diet published — user can download from their dashboard.
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-[rgba(34,197,94,0.06)] border border-[rgba(34,197,94,0.2)] space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-[#22c55e] font-semibold text-sm">
+                        <CheckCircle size={16} />
+                        Diet Plan Published
+                      </div>
+                      {order.dietFile && (
+                        <p className="text-[#a0a0a0] text-xs mt-1">
+                          File: <span className="text-white font-mono">{order.dietFile.originalFileName}</span>
+                          {order.dietFile.uploadedAt && (
+                            <> · Published: {formatDate(order.dietFile.uploadedAt)}</>
+                          )}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {order.dietFile && (
+                        <button
+                          type="button"
+                          onClick={handleViewPublishedDiet}
+                          disabled={isOpeningFile || isPending}
+                          className="btn-primary py-2 px-3 text-xs bg-[#22c55e] hover:bg-[#16a34a] justify-center"
+                          id={`view-published-pdf-${order.id}`}
+                        >
+                          {isOpeningFile ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <ExternalLink size={13} />
+                          )}
+                          View / Open Published PDF
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowReplaceForm((v) => !v)}
+                        disabled={isPending}
+                        className="btn-ghost border border-[#2a2a2a] text-xs py-2 px-3 text-[#a0a0a0] hover:text-white"
+                        id={`toggle-replace-pdf-${order.id}`}
+                      >
+                        {showReplaceForm ? "Cancel Replace" : "Replace PDF"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Optional Replace PDF form */}
+                {showReplaceForm && (
+                  <div className="p-4 rounded-xl bg-[#141414] border border-[#2a2a2a] space-y-3">
+                    <p className="text-white text-xs font-semibold">Upload Replacement PDF Plan</p>
+                    {!stagedFile ? (
+                      <>
+                        <label
+                          htmlFor={`pdf-replace-${order.id}`}
+                          className="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-[#2a2a2a] hover:border-[#c41e3a]/40 cursor-pointer transition-colors"
+                        >
+                          <Upload size={18} className="text-[#5a5a5a]" />
+                          <div>
+                            <p className="text-white text-sm font-medium">Select Replacement PDF File</p>
+                            <p className="text-[#5a5a5a] text-xs">Max 10 MB · Replaces current published PDF</p>
+                          </div>
+                        </label>
+                        <input
+                          id={`pdf-replace-${order.id}`}
+                          type="file"
+                          accept="application/pdf"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                        />
+                      </>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-[#1a0509] border border-[rgba(196,30,58,0.3)] space-y-3">
+                        <p className="text-white text-xs font-semibold">{stagedFile.name}</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={confirmUploadDietFile}
+                            disabled={isPending}
+                            className="btn-primary py-2 px-3 text-xs justify-center"
+                          >
+                            {isPending ? <Loader2 size={13} className="animate-spin" /> : "Confirm Replace"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setStagedFile(null)}
+                            disabled={isPending}
+                            className="btn-ghost border border-[#2a2a2a] text-xs py-2 px-3 text-[#a0a0a0]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Draft / Notes section */}
+                <div>
+                  <label className="form-label">Diet Notes / Draft Content given to user</label>
+                  <textarea
+                    rows={4}
+                    value={dietContent}
+                    onChange={(e) => setDietContent(e.target.value)}
+                    className="input-base resize-none mt-2 text-xs"
+                    placeholder="No draft text content entered."
+                  />
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={isPending}
+                    className="btn-ghost border border-[#2a2a2a] text-xs py-1.5 px-3 mt-2"
+                    id={`save-published-draft-${order.id}`}
+                  >
+                    {isPending ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                    Save Updated Notes
+                  </button>
+                </div>
               </div>
             )}
 

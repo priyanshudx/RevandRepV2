@@ -28,12 +28,40 @@ export default function AuthCallbackPage() {
         const nextParam = searchParams.get("next");
         const isRecovery = typeParam === "recovery" || nextParam?.includes("reset-pin");
 
-        // 1. Check if there's a code parameter in the URL query string
+        // 1. Check if there's a code or token_hash parameter in the URL query string
         const code = searchParams.get("code");
+        const tokenHash = searchParams.get("token_hash");
+
         if (code) {
           const { data, error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
           if (exchangeErr || !data.session) {
             if (mounted) setError(exchangeErr?.message ?? "Failed to verify reset link.");
+            return;
+          }
+
+          if (isRecovery) {
+            router.replace(ROUTES.resetPin);
+            return;
+          }
+
+          const res = await verifySupabaseTokenAction(data.session.access_token);
+          if (!res.success) {
+            if (mounted) setError(res.error);
+            return;
+          }
+
+          const target = res.user.role === "ADMIN" ? ROUTES.admin : redirectTo;
+          router.replace(target);
+          return;
+        }
+
+        if (tokenHash && typeParam) {
+          const { data, error: verifyErr } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: typeParam as any,
+          });
+          if (verifyErr || !data.session) {
+            if (mounted) setError(verifyErr?.message ?? "Failed to verify email link.");
             return;
           }
 

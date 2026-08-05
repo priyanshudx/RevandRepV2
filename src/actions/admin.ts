@@ -2,7 +2,7 @@
 
 import { requireAdmin } from "@/lib/dal";
 import { prisma } from "@/services/prisma";
-import { getSupabaseAdmin, DIET_BUCKET } from "@/services/supabase";
+import { getSupabaseAdmin, getSignedUrl, DIET_BUCKET } from "@/services/supabase";
 import { isAdminEmail } from "@/lib/utils";
 import type { AdminStats, OrderWithDetails } from "@/types";
 
@@ -432,6 +432,43 @@ export async function deleteOrderAction(
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to delete order.";
+    return { success: false, error: message };
+  }
+}
+
+// ── getAdminDietFileDownloadUrlAction ─────────────────────────────────────
+
+export async function getAdminDietFileDownloadUrlAction(
+  orderId: string
+): Promise<{ success: boolean; url?: string; fileName?: string; error?: string }> {
+  await requireAdmin();
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        dietFile: {
+          select: {
+            supabasePath: true,
+            originalFileName: true,
+          },
+        },
+      },
+    });
+
+    if (!order?.dietFile?.supabasePath) {
+      return { success: false, error: "No published diet plan file found for this order." };
+    }
+
+    const url = await getSignedUrl(order.dietFile.supabasePath, 3600);
+    return {
+      success: true,
+      url,
+      fileName: order.dietFile.originalFileName,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to generate download link.";
     return { success: false, error: message };
   }
 }

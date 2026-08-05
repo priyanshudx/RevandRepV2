@@ -43,7 +43,7 @@ export function SignupForm() {
       setSuccessMsg(null);
 
       try {
-        const res = await signUpUserAction(name, email, pin);
+        const res = await signUpUserAction(name, email, pin, redirectTo);
 
         if (!res.success) {
           setError(res.error);

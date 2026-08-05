@@ -16,18 +16,25 @@ import type { AuthUser } from "@/types";
 export async function signUpUserAction(
   name: string,
   email: string,
-  pin: string
+  pin: string,
+  redirectTo?: string
 ): Promise<{ success: true; user?: AuthUser; message?: string } | { success: false; error: string }> {
   try {
     const cleanEmail = email.trim().toLowerCase();
     const { getSupabase } = await import("@/services/supabase");
     const supabase = getSupabase();
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const redirectUrl = redirectTo
+      ? `${appUrl}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`
+      : `${appUrl}/auth/callback`;
+
     const { data: createdData, error: createErr } = await supabase.auth.signUp({
       email: cleanEmail,
       password: pin,
       options: {
         data: { name: name.trim() },
+        emailRedirectTo: redirectUrl,
       },
     });
 
@@ -187,7 +194,7 @@ export async function loginUserWithPinAction(
     // 1. Fast indexed database check (~2ms)
     const existingDbUser = await prisma.user.findUnique({
       where: { email: cleanEmail },
-      select: { id: true },
+      select: { id: true, supabaseId: true, name: true },
     });
 
     if (!existingDbUser) {
@@ -230,6 +237,8 @@ export async function loginUserWithPinAction(
         id: existingDbUser.id,
         email: cleanEmail,
         role,
+        supabaseId: existingDbUser.supabaseId ?? undefined,
+        name: existingDbUser.name ?? undefined,
       },
     };
   } catch (err) {
