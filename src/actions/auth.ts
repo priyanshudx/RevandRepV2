@@ -1,11 +1,26 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/services/supabase";
 import { prisma } from "@/services/prisma";
 import { createSession, deleteSession, getSession } from "@/lib/session";
 import { isAdminEmail } from "@/lib/utils";
 import type { AuthUser } from "@/types";
+
+async function getAppUrl(): Promise<string> {
+  try {
+    const headerList = await headers();
+    const host = headerList.get("x-forwarded-host") || headerList.get("host");
+    const proto = headerList.get("x-forwarded-proto") || (host?.includes("localhost") ? "http" : "https");
+    if (host) {
+      return `${proto}://${host}`;
+    }
+  } catch {
+    // Fallback if headers() call fails
+  }
+  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
 
 // ── signUpUserAction ──────────────────────────────────────────────────────
 
@@ -24,7 +39,7 @@ export async function signUpUserAction(
     const { getSupabase } = await import("@/services/supabase");
     const supabase = getSupabase();
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = await getAppUrl();
     const redirectUrl = redirectTo
       ? `${appUrl}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`
       : `${appUrl}/auth/callback`;
